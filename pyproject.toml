@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vuln-mitigation-analyst"
+version = "0.1.0"
+description = "Autonomous vulnerability mitigation micro-agent synthesizing Falco runtime eBPF compensating controls"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Curtis", email = "pipeline@oakai.local" }
+]
+dependencies = [
+    "pydantic>=2.7.0",
+    "pyyaml>=6.0.1",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+vuln-mitigation-analyst = "vuln_mitigation_analyst.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vuln_mitigation_analyst"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
