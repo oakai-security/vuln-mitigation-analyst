@@ -36,9 +36,7 @@ class FalcoRule(BaseModel):
     priority: FalcoPriority = Field(
         default=FalcoPriority.CRITICAL, description="Alert priority level"
     )
-    tags: list[str] = Field(
-        default_factory=list, description="Categorization and CVE tags"
-    )
+    tags: list[str] = Field(default_factory=list, description="Categorization and CVE tags")
 
 
 class MitigationRequest(BaseModel):

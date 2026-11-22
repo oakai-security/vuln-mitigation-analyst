@@ -53,7 +53,9 @@ class UdsMitigationServer:
         self._server_socket.bind(self.socket_path)
 
         try:
-            os.chmod(self.socket_path, 0o660)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+            os.chmod(
+                self.socket_path, 0o660
+            )  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
         except OSError as err:
             logger.warning("Could not set socket permissions to 0660: %s", err)
 
@@ -153,16 +155,58 @@ class UdsMitigationServer:
                 logger.error("Error processing mitigation request: %s", err)
                 conn.sendall(json.dumps({"error": str(err)}).encode("utf-8"))
 
+    def _read_ticket_frontmatter(self, ticket_path_str: str) -> dict:
+        """Read YAML frontmatter from an EXC-XXXX.md ticket on disk if available."""
+        if not ticket_path_str:
+            return {}
+        candidates = [Path(ticket_path_str)]
+        repo_path = os.environ.get("VULN_REGISTER_REPO", "/repo")
+        candidates.append(Path(repo_path) / ticket_path_str)
+        for p in candidates:
+            if p.is_file():
+                with contextlib.suppress(OSError):
+                    lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+                    in_fm = False
+                    data: dict = {"_resolved_path": str(p)}
+                    for line in lines:
+                        stripped = line.strip()
+                        if stripped == "---":
+                            if not in_fm:
+                                in_fm = True
+                                continue
+                            break
+                        if in_fm and ":" in stripped:
+                            k, v = stripped.split(":", 1)
+                            data[k.strip()] = v.strip().strip("'\"")
+                    return data
+        return {}
+
     def _parse_request(self, item: dict) -> MitigationRequest:
-        """Normalize input dictionary into MitigationRequest model."""
-        cve_id = item.get("cve_id", "")
-        pkg = item.get("package_name", "")
-        ver = item.get("installed_version", "unknown")
-        epss = float(item.get("epss_score", 0.0))
+        """Normalize input dictionary into MitigationRequest model, hydrating from ticket on disk."""
         ticket_path = item.get("ticket_path", "")
         ticket_id = item.get("id", item.get("ticket_id", ""))
         if not ticket_path and ticket_id:
             ticket_path = f"tickets/{ticket_id}.md"
+
+        fm = self._read_ticket_frontmatter(ticket_path)
+        if "_resolved_path" in fm:
+            ticket_path = fm["_resolved_path"]
+
+        cve_id = item.get("cve_id") or fm.get("cve_id", "")
+        pkg = item.get("package_name") or fm.get("package_name", "")
+        ver = item.get("installed_version") or fm.get("installed_version", "unknown")
+
+        raw_epss = item.get("epss_score", fm.get("epss_score", 0.0))
+        try:
+            epss = float(raw_epss)
+        except (TypeError, ValueError):
+            epss = 0.0
+
+        raw_cvss = item.get("cvss_base", fm.get("cvss_base", 7.5))
+        try:
+            cvss = float(raw_cvss)
+        except (TypeError, ValueError):
+            cvss = 7.5
 
         return MitigationRequest(
             cve_id=cve_id,
@@ -170,9 +214,9 @@ class UdsMitigationServer:
             installed_version=ver,
             epss_score=epss,
             ticket_path=ticket_path,
-            cvss_base=float(item.get("cvss_base", 7.5)),
-            description=item.get("description", ""),
-            host=item.get("host", "lejeune"),
+            cvss_base=cvss,
+            description=item.get("description") or fm.get("summary", ""),
+            host=item.get("host") or fm.get("host", "lejeune"),
         )
 
     def _forward_to_approver(self, payloads: list[dict]):

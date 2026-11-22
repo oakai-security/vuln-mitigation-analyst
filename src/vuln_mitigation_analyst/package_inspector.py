@@ -1,5 +1,6 @@
 """Deterministic package binary, library, and behavioral profile discovery."""
 
+import contextlib
 import logging
 import os
 import shutil
@@ -21,6 +22,8 @@ KNOWN_PACKAGE_BINARIES: dict[str, list[str]] = {
     "git": ["git"],
     "bind9-host": ["host", "named"],
     "bind9-libs": ["named", "host", "dig"],
+    "libruby3.1": ["ruby", "ruby3.1", "irb", "gem"],
+    "ruby3.1": ["ruby", "ruby3.1", "irb", "gem"],
 }
 
 
@@ -35,7 +38,24 @@ class PackageInspector:
         clean_name = package_name.lower().split(":")[0]
         binaries: set[str] = set()
 
-        # 1. Try querying dpkg -L if available
+        # 1. Read /var/lib/dpkg/info/{clean_name}*.list directly if mounted
+        info_dir = self.dpkg_db / "info"
+        if info_dir.is_dir():
+            candidates = [info_dir / f"{clean_name}.list"]
+            with contextlib.suppress(OSError):
+                candidates.extend(info_dir.glob(f"{clean_name}:*.list"))
+            for list_file in candidates:
+                if not list_file.is_file():
+                    continue
+                with contextlib.suppress(OSError):
+                    for line in list_file.read_text(encoding="utf-8", errors="ignore").splitlines():
+                        p = line.strip()
+                        if p.startswith(("/bin/", "/usr/bin/", "/sbin/", "/usr/sbin/")):
+                            basename = os.path.basename(p)
+                            if basename:
+                                binaries.add(basename)
+
+        # 2. Try querying dpkg -L if available
         if shutil.which("dpkg"):
             try:
                 res = subprocess.run(
@@ -59,9 +79,11 @@ class PackageInspector:
         if clean_name in KNOWN_PACKAGE_BINARIES:
             binaries.update(KNOWN_PACKAGE_BINARIES[clean_name])
 
-        # 3. If still empty, use cleaned package name as candidate
+        # 4. If still empty, use cleaned package name as candidate
         if not binaries:
-            candidate = clean_name.replace("lib", "").rstrip("0123456789-")
+            candidate = clean_name
+            candidate = candidate.removeprefix("lib")
+            candidate = candidate.rstrip("0123456789.-")
             if candidate:
                 binaries.add(candidate)
             else:
