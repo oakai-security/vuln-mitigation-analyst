@@ -164,3 +164,35 @@ def test_uds_socket_roundtrip(mocker):
         assert results[0]["cve_id"] == "CVE-2024-38077"
         assert results[0]["syntax_valid"] is True
         assert results[0]["deployed"] is True
+
+
+def test_deployer_stages_host_falco_reload_trigger(tmp_path):
+    """Verify RuleDeployer writes SHA-256 verified trigger JSON for host reconciler."""
+    rules_dir = tmp_path / "rules"
+    trigger_file = tmp_path / "ipc" / "falco_reload.json"
+    trigger_file.parent.mkdir(parents=True, exist_ok=True)
+    ticket_file = tmp_path / "EXC-0038.md"
+    ticket_file.write_text("---\nid: EXC-0038\n---\nBody\n", encoding="utf-8")
+
+    deployer = RuleDeployer(
+        rules_dir=str(rules_dir), reload_trigger_path=str(trigger_file)
+    )
+    req = MitigationRequest(
+        cve_id="CVE-2026-77692",
+        package_name="bind9-host",
+        installed_version="1:9.18",
+        epss_score=0.0656,
+        ticket_path=str(ticket_file),
+    )
+
+    res = deployer.deploy_rule(
+        req,
+        "Oakai Mitigate CVE-2026-77692 (bind9-host)",
+        "- rule: test\n  desc: test\n",
+    )
+    assert res.deployed is True
+    assert trigger_file.exists()
+    trig = json.loads(trigger_file.read_text(encoding="utf-8"))
+    assert len(trig["pending_rules"]) == 1
+    assert trig["pending_rules"][0]["filename"] == "oakai_mitigate_cve_2026_77692.yaml"
+
