@@ -56,7 +56,7 @@ class RuleSynthesizer:
             return None
 
         prompt = (
-            "Return ONLY a JSON object with a single key \"desc\" containing a concise 1-sentence "
+            'Return ONLY a JSON object with a single key "desc" containing a concise 1-sentence '
             f"Falco runtime security rule description for {request.cve_id} affecting package "
             f"{request.package_name} (version {request.installed_version}, binaries: {', '.join(candidate_binaries)}). "
             f"Context: {request.description or 'Linux package vulnerability'}."

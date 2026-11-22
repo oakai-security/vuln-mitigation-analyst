@@ -106,7 +106,9 @@ class RuleDeployer:
                 try:
                     with os.fdopen(fd, "w", encoding="utf-8") as fh:
                         json.dump(payload, fh, indent=2)
-                    os.chmod(tmp_path, 0o664)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                    os.chmod(
+                        tmp_path, 0o664
+                    )  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
                     os.replace(tmp_path, str(self.reload_trigger_path))
                 finally:
                     if os.path.exists(tmp_path):
@@ -151,7 +153,9 @@ class RuleDeployer:
 
         ticket_path = Path(ticket_path_str)
         if not ticket_path.exists():
-            logger.warning("Ticket path %s does not exist; skipping markdown injection", ticket_path)
+            logger.warning(
+                "Ticket path %s does not exist; skipping markdown injection", ticket_path
+            )
             return
 
         try:
@@ -181,7 +185,11 @@ class RuleDeployer:
                     continue
 
             if line.strip().startswith(
-                ("compensating_control_active:", "compensating_control_ref:", "compensating_control_file:")
+                (
+                    "compensating_control_active:",
+                    "compensating_control_ref:",
+                    "compensating_control_file:",
+                )
             ):
                 continue
 

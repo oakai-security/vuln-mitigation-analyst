@@ -138,6 +138,7 @@ def test_uds_socket_roundtrip(mocker):
         server_thread.start()
 
         import time
+
         time.sleep(0.1)
 
         client_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -174,9 +175,7 @@ def test_deployer_stages_host_falco_reload_trigger(tmp_path):
     ticket_file = tmp_path / "EXC-0038.md"
     ticket_file.write_text("---\nid: EXC-0038\n---\nBody\n", encoding="utf-8")
 
-    deployer = RuleDeployer(
-        rules_dir=str(rules_dir), reload_trigger_path=str(trigger_file)
-    )
+    deployer = RuleDeployer(rules_dir=str(rules_dir), reload_trigger_path=str(trigger_file))
     req = MitigationRequest(
         cve_id="CVE-2026-77692",
         package_name="bind9-host",
@@ -195,4 +194,3 @@ def test_deployer_stages_host_falco_reload_trigger(tmp_path):
     trig = json.loads(trigger_file.read_text(encoding="utf-8"))
     assert len(trig["pending_rules"]) == 1
     assert trig["pending_rules"][0]["filename"] == "oakai_mitigate_cve_2026_77692.yaml"
-
